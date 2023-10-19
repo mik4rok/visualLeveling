@@ -25,6 +25,7 @@
 #include "edge-impulse-sdk/dsp/image/image.hpp"
 
 #include "esp_camera.h"
+#include <Servo.h>
 
 // Select camera model - find more camera models in camera_pins.h file here
 // https://github.com/espressif/arduino-esp32/blob/master/libraries/ESP32/examples/Camera/CameraWebServer/camera_pins.h
@@ -82,6 +83,7 @@
 /* Private variables ------------------------------------------------------- */
 static bool debug_nn = false; // Set this to true to see e.g. features generated from the raw signal
 static bool is_initialised = false;
+static const int servoPin = 14;
 uint8_t *snapshot_buf; //points to the output of the capture
 
 static camera_config_t camera_config = {
@@ -129,6 +131,7 @@ void setup()
 {
     // put your setup code here, to run once:
     Serial.begin(115200);
+    servo1.attach(servoPin);
     //comment out the below line to start inference immediately after upload
     while (!Serial);
     Serial.println("Edge Impulse Inferencing Demo");
@@ -150,7 +153,7 @@ void setup()
 */
 void loop()
 {
-
+    int posDegrees = 0;
     // instead of wait_ms, we'll wait on the signal, this allows threads to cancel us...
     if (ei_sleep(5) != EI_IMPULSE_OK) {
         return;
@@ -203,7 +206,13 @@ void loop()
     for (size_t ix = 0; ix < EI_CLASSIFIER_LABEL_COUNT; ix++) {
         ei_printf("    %s: %.5f\n", result.classification[ix].label,
                                     result.classification[ix].value);
+    for (size_t ix = 0; ix < EI_CLASSIFIER_LABEL_COUNT; ix++) {
+        posDegrees += (int)(result.classification[ix].label * result.classification[ix].value));
     }
+    posDegrees = posDegrees / EI_CLASSIFIER_LABEL_COUNT;
+    servo1.write(posDegrees);
+    Serial.println(posDegrees);
+        ei_printf("    %s\n", posDegrees);
 #endif
 
 #if EI_CLASSIFIER_HAS_ANOMALY == 1
