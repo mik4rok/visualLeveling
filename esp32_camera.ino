@@ -25,7 +25,7 @@
 #include "edge-impulse-sdk/dsp/image/image.hpp"
 
 #include "esp_camera.h"
-#include <Servo.h>
+#include <ESP32Servo.h>
 
 // Select camera model - find more camera models in camera_pins.h file here
 // https://github.com/espressif/arduino-esp32/blob/master/libraries/ESP32/examples/Camera/CameraWebServer/camera_pins.h
@@ -80,10 +80,14 @@
 #define EI_CAMERA_RAW_FRAME_BUFFER_ROWS           240
 #define EI_CAMERA_FRAME_BYTE_SIZE                 3
 
+/* Servo constant defines -------------------------------------------------- */
+#define SERVO_STEP       5
+#define SERVO1_PIN      14
+#define SERVO2_PIN      15
+
 /* Private variables ------------------------------------------------------- */
 static bool debug_nn = false; // Set this to true to see e.g. features generated from the raw signal
 static bool is_initialised = false;
-static const int servoPin = 14;
 uint8_t *snapshot_buf; //points to the output of the capture
 
 static camera_config_t camera_config = {
@@ -124,14 +128,23 @@ bool ei_camera_init(void);
 void ei_camera_deinit(void);
 bool ei_camera_capture(uint32_t img_width, uint32_t img_height, uint8_t *out_buf) ;
 
+Servo servo1;  // create servo1 object to control a servo1
+Servo servo2;  // create servo2 object to control a servo2
+
+int servo1pos = 0;    // variable to store the servo1 position
+int servo2pos = 0;    // variable to store the servo2 position
+
 /**
 * @brief      Arduino setup function
 */
 void setup()
 {
     // put your setup code here, to run once:
+    servo1.setPeriodHertz(50);    // standard 50 hz servo
+    servo2.setPeriodHertz(50);    // standard 50 hz servo
+    servo1.attach(SERVO1_PIN, 1000, 2000);
+    servo2.attach(SERVO2_PIN, 1000, 2000);
     Serial.begin(115200);
-    servo1.attach(servoPin);
     //comment out the below line to start inference immediately after upload
     while (!Serial);
     Serial.println("Edge Impulse Inferencing Demo");
@@ -153,7 +166,7 @@ void setup()
 */
 void loop()
 {
-    int posDegrees = 0;
+
     // instead of wait_ms, we'll wait on the signal, this allows threads to cancel us...
     if (ei_sleep(5) != EI_IMPULSE_OK) {
         return;
@@ -203,16 +216,18 @@ void loop()
         ei_printf("    No objects found\n");
     }
 #else
+    servo1pos = 0;
+    servo2pos = 0;
     for (size_t ix = 0; ix < EI_CLASSIFIER_LABEL_COUNT; ix++) {
         ei_printf("    %s: %.5f\n", result.classification[ix].label,
                                     result.classification[ix].value);
-    for (size_t ix = 0; ix < EI_CLASSIFIER_LABEL_COUNT; ix++) {
-        posDegrees += (int)(result.classification[ix].label * result.classification[ix].value));
+       // calculating servo position
+       servo1pos = servo1pos + int(ix * (result.classification[ix].value));
     }
-    posDegrees = posDegrees / EI_CLASSIFIER_LABEL_COUNT;
-    servo1.write(posDegrees);
-    Serial.println(posDegrees);
-        ei_printf("    %s\n", posDegrees);
+    servo1pos = servo1pos * 2000 / EI_CLASSIFIER_LABEL_COUNT;
+    ei_printf("    :%d\n", servo1pos);
+    servo1.write(0);              // tell servo1 to go to position in variable 'servo1pos'
+    servo1.write(0);              // tell servo2 to go to position in variable 'servo2pos' 
 #endif
 
 #if EI_CLASSIFIER_HAS_ANOMALY == 1
