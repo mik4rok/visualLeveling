@@ -26,6 +26,7 @@
 
 #include "esp_camera.h"
 #include <ESP32Servo.h>
+#include <PID_v1.h>
 
 // Select camera model - find more camera models in camera_pins.h file here
 // https://github.com/espressif/arduino-esp32/blob/master/libraries/ESP32/examples/Camera/CameraWebServer/camera_pins.h
@@ -123,6 +124,17 @@ static camera_config_t camera_config = {
     .grab_mode = CAMERA_GRAB_WHEN_EMPTY,
 };
 
+/* PID variables definitions ------------------------------------------------------- */
+//Define Variables we'll be connecting to
+double Setpoint, Input, Output;
+
+//Define the aggressive and conservative Tuning Parameters
+double aggKp=4, aggKi=0.2, aggKd=1;
+double consKp=1, consKi=0.05, consKd=0.25;
+
+//Specify the links and initial tuning parameters
+PID myPID(&Input, &Output, &Setpoint, consKp, consKi, consKd, DIRECT);
+
 /* Function definitions ------------------------------------------------------- */
 bool ei_camera_init(void);
 void ei_camera_deinit(void);
@@ -140,6 +152,15 @@ int servo2pos = 0;    // variable to store the servo2 position
 void setup()
 {
     // put your setup code here, to run once:
+
+    //PID setup initialize the variables we're linked to
+    Input = 1000;       // horisontal position
+    Setpoint = 1000;    //middle of 0 to 2000 ms servo
+
+    //turn the PID on
+    myPID.SetMode(AUTOMATIC);
+
+    //Servo setup
     servo1.setPeriodHertz(50);    // standard 50 hz servo
     servo2.setPeriodHertz(50);    // standard 50 hz servo
     servo1.attach(SERVO1_PIN, 1000, 2000);
@@ -226,6 +247,24 @@ void loop()
     }
     servo1pos = servo1pos * 2000 / EI_CLASSIFIER_LABEL_COUNT;
     ei_printf("    :%d\n", servo1pos);
+
+    //PID tuning
+      Input = servo1pos;
+
+      double gap = abs(Setpoint-Input); //distance away from setpoint
+      if (gap < 10)
+      {  //we're close to setpoint, use conservative tuning parameters
+        myPID.SetTunings(consKp, consKi, consKd);
+      }
+      else
+      {
+        //we're far from setpoint, use aggressive tuning parameters
+        myPID.SetTunings(aggKp, aggKi, aggKd);
+      }
+
+      myPID.Compute();
+      servo1pos = Output;
+    
     servo1.write(servo1pos);              // tell servo1 to go to position in variable 'servo1pos'
     servo2.write(0);              // tell servo2 to go to position in variable 'servo2pos' 
 #endif
