@@ -226,8 +226,8 @@ void loop()
     }
     servo1pos = servo1pos * 2000 / EI_CLASSIFIER_LABEL_COUNT;
     ei_printf("    :%d\n", servo1pos);
-    servo1.write(0);              // tell servo1 to go to position in variable 'servo1pos'
-    servo1.write(0);              // tell servo2 to go to position in variable 'servo2pos' 
+    servo1.write(servo1pos);              // tell servo1 to go to position in variable 'servo1pos'
+    servo2.write(0);              // tell servo2 to go to position in variable 'servo2pos' 
 #endif
 
 #if EI_CLASSIFIER_HAS_ANOMALY == 1
