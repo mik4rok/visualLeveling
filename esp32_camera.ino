@@ -129,8 +129,8 @@ static camera_config_t camera_config = {
 double Setpoint, Input, Output;
 
 //Define the aggressive and conservative Tuning Parameters
-double aggKp=4, aggKi=0.2, aggKd=1;
-double consKp=1, consKi=0.05, consKd=0.25;
+double aggKp=1, aggKi=0.05, aggKd=0.25;
+double consKp=0.2, consKi=0.005, consKd=0.025;
 
 //Specify the links and initial tuning parameters
 PID myPID(&Input, &Output, &Setpoint, consKp, consKi, consKd, DIRECT);
@@ -146,6 +146,9 @@ Servo servo2;  // create servo2 object to control a servo2
 int servo1pos = 0;    // variable to store the servo1 position
 int servo2pos = 0;    // variable to store the servo2 position
 
+int angle1 = 0;    // variable to store the angle1
+int angle2 = 0;    // variable to store the angle2
+
 /**
 * @brief      Arduino setup function
 */
@@ -154,8 +157,8 @@ void setup()
     // put your setup code here, to run once:
 
     //PID setup initialize the variables we're linked to
-    Input = 1000;       // horisontal position
-    Setpoint = 1000;    //middle of 0 to 2000 ms servo
+    Input = 1000;       // milli_seconds servo output when in horisontal position
+    Setpoint = 1000;    // middle from 0 to 2000 milli_seconds
 
     //turn the PID on
     myPID.SetMode(AUTOMATIC);
@@ -221,8 +224,8 @@ void loop()
     }
 
     // print the predictions
-    ei_printf("Predictions (DSP: %d ms., Classification: %d ms., Anomaly: %d ms.): \n",
-                result.timing.dsp, result.timing.classification, result.timing.anomaly);
+    //ei_printf("Predictions (DSP: %d ms., Classification: %d ms., Anomaly: %d ms.): \n",
+    //            result.timing.dsp, result.timing.classification, result.timing.anomaly);
 
 #if EI_CLASSIFIER_OBJECT_DETECTION == 1
     bool bb_found = result.bounding_boxes[0].value > 0;
@@ -231,28 +234,28 @@ void loop()
         if (bb.value == 0) {
             continue;
         }
-        ei_printf("    %s (%f) [ x: %u, y: %u, width: %u, height: %u ]\n", bb.label, bb.value, bb.x, bb.y, bb.width, bb.height);
+        //ei_printf("    %s (%f) [ x: %u, y: %u, width: %u, height: %u ]\n", bb.label, bb.value, bb.x, bb.y, bb.width, bb.height);
     }
     if (!bb_found) {
         ei_printf("    No objects found\n");
     }
 #else
-    servo1pos = 0;
-    servo2pos = 0;
+    angle1 = 0;
+    angle2 = 0;
     for (size_t ix = 0; ix < EI_CLASSIFIER_LABEL_COUNT; ix++) {
-        ei_printf("    %s: %.5f\n", result.classification[ix].label,
-                                    result.classification[ix].value);
-       // calculating servo position
-       servo1pos = servo1pos + int(ix * (result.classification[ix].value));
+        //ei_printf("    %s: %.5f\n", result.classification[ix].label,
+        //                            result.classification[ix].value);
+        // calculating servo position
+        angle1 = angle1 + int(1000 * ix * (result.classification[ix].value));
     }
-    servo1pos = servo1pos * 2000 / EI_CLASSIFIER_LABEL_COUNT;
-    ei_printf("    :%d\n", servo1pos);
+    ei_printf(" angle1 :%d\n", angle1);
 
     //PID tuning
-      Input = servo1pos;
+      Input = angle1  * 10 / 21;     // угол в миллиградусах от 0 до 42000 а выход на сервопривод от 0 до 2000
 
-      double gap = abs(Setpoint-Input); //distance away from setpoint
-      if (gap < 10)
+      int gap = abs(Setpoint - Input); //distance away from setpoint
+      ei_printf("   gap :%d\n", gap);
+      if (gap < 400)
       {  //we're close to setpoint, use conservative tuning parameters
         myPID.SetTunings(consKp, consKi, consKd);
       }
@@ -264,7 +267,7 @@ void loop()
 
       myPID.Compute();
       servo1pos = Output;
-    
+      ei_printf("   PID :%d\n", servo1pos);
     servo1.write(servo1pos);              // tell servo1 to go to position in variable 'servo1pos'
     servo2.write(0);              // tell servo2 to go to position in variable 'servo2pos' 
 #endif
